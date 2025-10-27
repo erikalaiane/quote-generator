@@ -1,23 +1,50 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Copy, Check } from 'lucide-react';
+import { RefreshCw, Copy, Check, Wifi, WifiOff } from 'lucide-react';
+
+// Quotes de fallback caso a API falhe
+const fallbackQuotes = [
+  { content: "A vida é o que acontece enquanto você está ocupado fazendo outros planos.", author: "John Lennon" },
+  { content: "Seja a mudança que você deseja ver no mundo.", author: "Mahatma Gandhi" },
+  { content: "O sucesso é ir de fracasso em fracasso sem perder o entusiasmo.", author: "Winston Churchill" },
+  { content: "A imaginação é mais importante que o conhecimento.", author: "Albert Einstein" },
+  { content: "Você perde 100% dos tiros que não dá.", author: "Wayne Gretzky" },
+  { content: "A única maneira de fazer um ótimo trabalho é amar o que você faz.", author: "Steve Jobs" },
+  { content: "Acredite que você pode e você já está no meio do caminho.", author: "Theodore Roosevelt" },
+  { content: "Não conte os dias, faça os dias contarem.", author: "Muhammad Ali" }
+];
 
 export default function QuoteGenerator() {
   const [quote, setQuote] = useState('');
   const [author, setAuthor] = useState('');
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   const fetchQuote = async () => {
     setLoading(true);
     try {
-      const response = await fetch('https://api.quotable.io/random');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+      
+      const response = await fetch('https://api.quotable.io/random', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) throw new Error('API error');
+      
       const data = await response.json();
       setQuote(data.content);
       setAuthor(data.author);
+      setIsOnline(true);
     } catch (error) {
-      console.error('Erro ao buscar quote:', error);
-      setQuote('Falha ao carregar quote. Tente novamente!');
-      setAuthor('');
+      console.warn('Usando quote local:', error.message);
+      // Usa quote local se a API falhar
+      const randomQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+      setQuote(randomQuote.content);
+      setAuthor(randomQuote.author);
+      setIsOnline(false);
     } finally {
       setLoading(false);
     }
@@ -61,8 +88,26 @@ export default function QuoteGenerator() {
               <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold uppercase rounded-full transform -rotate-2">Quote</span>
               <span className="px-3 py-1 bg-zinc-900 text-white text-xs font-bold uppercase rounded-full transform rotate-2">Generator</span>
             </div>
-            <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center transform rotate-12">
-              <span className="text-white text-2xl font-bold">"</span>
+            <div className="flex items-center gap-3">
+              {/* Indicador de Status */}
+              {!loading && (
+                <div className="flex items-center gap-1 text-xs">
+                  {isOnline ? (
+                    <>
+                      <Wifi className="w-4 h-4 text-green-600" />
+                      <span className="text-green-600 font-semibold">API</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="w-4 h-4 text-orange-600" />
+                      <span className="text-orange-600 font-semibold">Local</span>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center transform rotate-12">
+                <span className="text-white text-2xl font-bold">"</span>
+              </div>
             </div>
           </div>
 
@@ -120,6 +165,15 @@ export default function QuoteGenerator() {
             </button>
           </div>
 
+          {/* Aviso se estiver offline */}
+          {!isOnline && !loading && (
+            <div className="mt-4 p-3 bg-orange-50 border-l-4 border-orange-600 rounded">
+              <p className="text-xs text-orange-800">
+                <span className="font-bold">Modo Offline:</span> Usando quotes locais. Verifique sua conexão com a internet.
+              </p>
+            </div>
+          )}
+
           {/* Decoração Grafitti */}
           <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-red-600 rounded-full opacity-20 blur-2xl"></div>
           <div className="absolute -top-4 -left-4 w-16 h-16 bg-zinc-900 rounded-full opacity-20 blur-xl"></div>
@@ -128,7 +182,7 @@ export default function QuoteGenerator() {
 
       {/* Footer */}
       <div className="absolute bottom-4 text-center text-white text-sm opacity-50">
-        <p>Powered by quotable.io</p>
+        <p>Powered by quotable.io {!isOnline && '(offline mode)'}</p>
       </div>
     </div>
   );
